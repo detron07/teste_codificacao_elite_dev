@@ -1,0 +1,71 @@
+// Esquema do banco da Casa de Leilões.
+// Convenções:
+//  - Valores monetários são inteiros em CENTAVOS (nunca float).
+//  - Tabelas/colunas em snake_case no banco; camelCase no código (via @map/@@map).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AUCTIONEER // Leiloeiro: cria e gerencia lotes; não dá lances
+  BIDDER // Licitante: deposita saldo, dá lances e arremata
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(254)
+  passwordHash String   @map("password_hash")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  wallet Wallet?
+
+  @@map("users")
+}
+
+/// Carteira simulada. `balanceCents` é o saldo TOTAL.
+/// O saldo comprometido não é armazenado: é derivado dos lotes abertos em que o
+/// usuário lidera, o que evita divergência entre duas fontes de verdade.
+model Wallet {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  balanceCents BigInt   @default(0) @map("balance_cents")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+enum WalletTransactionType {
+  DEPOSIT // Depósito simulado do licitante
+  SETTLEMENT_DEBIT // Débito do vencedor ao liquidar um lote
+  SETTLEMENT_CREDIT // Crédito ao leiloeiro ao liquidar um lote
+}
+
+/// Livro-razão (append-only) de movimentações da carteira.
+model WalletTransaction {
+  id                String                @id @default(uuid()) @db.Uuid
+  walletId          String                @map("wallet_id") @db.Uuid
+  type              WalletTransactionType
+  /// Valor com sinal: positivo = entrada, negativo = saída.
+  amountCents       BigInt                @map("amount_cents")
+  balanceAfterCents BigInt                @map("balance_after_cents")
+  description       String?               @db.VarChar(255)
+  createdAt         DateTime              @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@map("wallet_transactions")
+}
