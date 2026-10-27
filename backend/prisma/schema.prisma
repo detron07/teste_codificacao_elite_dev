@@ -26,7 +26,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  wallet Wallet?
+  wallet       Wallet?
+  createdLots  Lot[]    @relation("AuctioneerLots")
+  wonLots      Lot[]    @relation("WinningBidderLots")
+  bids         Bid[]
 
   @@map("users")
 }
@@ -68,4 +71,70 @@ model WalletTransaction {
 
   @@index([walletId, createdAt])
   @@map("wallet_transactions")
+}
+
+enum LotStatus {
+  SCHEDULED // Agendado (startsAt no futuro)
+  ACTIVE // Ao vivo (startsAt <= agora < endsAt)
+  FINISHED // Encerrado (agora >= endsAt)
+  CANCELLED // Cancelado pelo leiloeiro (apenas se sem lances)
+}
+
+/// Lote de leilão.
+/// Contém o snapshot completo dos dados da obra no momento da criação,
+/// garantindo resiliência total mesmo se a API externa de arte estiver fora do ar.
+model Lot {
+  id                 String    @id @default(uuid()) @db.Uuid
+  auctioneerId       String    @map("auctioneer_id") @db.Uuid
+  winningBidderId    String?   @map("winning_bidder_id") @db.Uuid
+  title              String    @db.VarChar(200)
+  description        String?   @db.Text
+  externalItemId     String    @map("external_item_id") @db.VarChar(100)
+  imageUrl           String    @map("image_url") @db.Text
+  /// Snapshot dos atributos da obra (artista, data, técnica, dimensões, etc.)
+  itemAttributes     Json      @map("item_attributes")
+  startPriceCents    BigInt    @map("start_price_cents")
+  minIncrementCents  BigInt    @map("min_increment_cents")
+  /// Lance atual (denormalizado para consultas rápidas; validado contra os lances)
+  currentPriceCents  BigInt    @map("current_price_cents")
+  startsAt           DateTime  @map("starts_at")
+  endsAt             DateTime  @map("ends_at")
+  /// Fim original antes de qualquer prorrogação anti-sniping
+  originalEndsAt     DateTime  @map("original_ends_at")
+  status             LotStatus @default(SCHEDULED)
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason") @db.VarChar(255)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  auctioneer    User      @relation("AuctioneerLots", fields: [auctioneerId], references: [id], onDelete: Restrict)
+  winningBidder User?     @relation("WinningBidderLots", fields: [winningBidderId], references: [id], onDelete: SetNull)
+  bids          Bid[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([auctioneerId])
+  @@map("lots")
+}
+
+/// Lance registrado no leilão.
+/// Forma uma cadeia de hashes criptográfica (tamper-proof hash chain),
+/// garantindo que qualquer inserção, deleção ou modificação manual seja detectada.
+model Bid {
+  id             String   @id @default(uuid()) @db.Uuid
+  lotId          String   @map("lot_id") @db.Uuid
+  bidderId       String   @map("bidder_id") @db.Uuid
+  amountCents    BigInt   @map("amount_cents")
+  previousBidId  String?  @map("previous_bid_id") @db.Uuid
+  previousHash   String?  @map("previous_hash") @db.VarChar(64)
+  hash           String   @db.VarChar(64)
+  ipAddress      String?  @map("ip_address") @db.VarChar(45)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  lot    Lot  @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  bidder User @relation(fields: [bidderId], references: [id], onDelete: Restrict)
+
+  @@index([lotId, amountCents(sort: Desc)])
+  @@index([lotId, createdAt(sort: Asc)])
+  @@index([bidderId])
+  @@map("bids")
 }
