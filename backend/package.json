@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "prebuild": "node -e \"fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); fs.rmSync('tsconfig.build.tsbuildinfo', { force: true })\"",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",

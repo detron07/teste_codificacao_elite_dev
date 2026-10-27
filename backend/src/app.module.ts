@@ -7,6 +7,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
+import { ArtworksModule } from './artworks/artworks.module';
+import { LotsModule } from './lots/lots.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 
@@ -18,6 +20,8 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    ArtworksModule,
+    LotsModule,
   ],
   controllers: [HealthController],
   providers: [
