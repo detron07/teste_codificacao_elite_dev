@@ -1,8 +1,8 @@
 # Casa de Leilões Online
 
 Casa de leilões em tempo real desenvolvida para o teste técnico **Elite Dev — Verzel**.
-Leiloeiros montam lotes a partir de obras de arte da API pública do
-[Art Institute of Chicago](https://api.artic.edu/docs/), e licitantes disputam cada lote com
+Leiloeiros montam lotes a partir de obras de arte de API pública de museu
+([Cleveland Museum of Art Open Access API](https://openaccess-api.clevelandart.org/)), e licitantes disputam cada lote com
 lances ao vivo, saldo simulado e histórico de lances auditável publicamente.
 
 > **Projeto em desenvolvimento incremental.** Este README é atualizado a cada etapa.
@@ -44,9 +44,11 @@ lances ao vivo, saldo simulado e histórico de lances auditável publicamente.
 ├── backend/            # API NestJS
 │   ├── prisma/         # schema, migrações e seed
 │   └── src/
+│       ├── artworks/   # catálogo externo de obras (Cleveland Museum + fallback resiliente)
 │       ├── auth/       # cadastro, login, JWT, guards de papel
 │       ├── config/     # validação das variáveis de ambiente
 │       ├── health/     # health check
+│       ├── lots/       # gestão de lotes, vitrine e painel do leiloeiro
 │       ├── prisma/     # PrismaService
 │       └── users/
 ├── frontend/           # (etapa 5)
@@ -81,7 +83,7 @@ cd backend
 cp .env.example .env        # ajuste os valores se necessário
 npm install
 npm run prisma:deploy       # aplica as migrações
-npm run db:seed             # cria os usuários de teste
+npm run db:seed             # cria os usuários de teste e lotes iniciais
 npm run start:dev           # API em http://localhost:3000/api
 ```
 
@@ -108,6 +110,14 @@ Criados pelo `npm run db:seed` (senha de todos: **`Leilao123`**):
 | Licitante | `ana@casadeleiloes.dev` | R$ 50.000,00 |
 | Licitante | `bruno@casadeleiloes.dev` | R$ 30.000,00 |
 
+### Lotes de demonstração semeados
+
+O seed também publica lotes cobrindo todos os estados do sistema para testes imediatos:
+
+1. **Lote ao vivo aberto a lances:** *The Red Kerchief* (Claude Monet) — Lance inicial R$ 5.000,00, disputado entre Ana (R$ 5.000,00) e Bruno (R$ 5.500,00 - líder atual).
+2. **Lote agendado sem lances:** *Water Lilies (Nymphéas)* (Claude Monet) — Inicia em 24h; apto para testar o fluxo de cancelamento pelo leiloeiro.
+3. **Lote encerrado:** *Portrait of a Woman* (Rembrandt) — Arrematado por Ana por R$ 14.000,00.
+
 ## API
 
 Prefixo: `/api`. Rotas são **protegidas por padrão** (JWT via `Authorization: Bearer <token>`);
@@ -119,32 +129,33 @@ rotas públicas são marcadas explicitamente.
 | `POST` | `/auth/register` | Público | Cadastro (`role`: `AUCTIONEER` ou `BIDDER`) |
 | `POST` | `/auth/login` | Público | Login -> `{ accessToken, user }` |
 | `GET` | `/auth/me` | Autenticado | Usuário logado |
+| `GET` | `/artworks/search` | Leiloeiro | Busca obras de arte na API externa com fallback |
+| `GET` | `/artworks/:id` | Leiloeiro | Detalhes de uma obra de arte |
+| `GET` | `/lots/showcase` | Público | Vitrine de lotes (ao vivo, agendados e encerrados) |
+| `GET` | `/lots/:id` | Público | Detalhes de um lote e contagem de lances |
+| `POST` | `/lots` | Leiloeiro | Cria lote a partir de uma obra (snapshot persistido) |
+| `POST` | `/lots/:id/cancel` | Leiloeiro | Cancela lote (apenas se sem lances) |
+| `GET` | `/lots/auctioneer/my-lots` | Leiloeiro | Painel com métricas de arrecadação e status |
 
 ## Decisões técnicas
 
-- **Dinheiro em centavos inteiros** — nenhum valor monetário usa ponto flutuante. Saldos de
-  carteira usam `BIGINT`.
-- **Saldo comprometido derivado** — a carteira armazena apenas o saldo total; o comprometido é
-  calculado a partir dos lotes abertos em que o licitante lidera. Uma única fonte de verdade
-  elimina divergências entre "saldo" e "reservas".
-- **Livro-razão de carteira** — toda movimentação (depósito, débito/crédito de liquidação) gera um
-  registro em `wallet_transactions` com o saldo resultante.
+- **Dinheiro em centavos inteiros** — nenhum valor monetário usa ponto flutuante. Saldos e lances usam `BIGINT`.
+- **Saldo comprometido derivado** — a carteira armazena apenas o saldo total; o comprometido é calculado a partir dos lotes abertos em que o licitante lidera. Uma única fonte de verdade elimina divergências entre "saldo" e "reservas".
+- **Resiliência da API externa (Snapshotting)** — ao criar um lote, todos os dados da obra (título, artista, técnica, dimensões e URL de imagem) são gravados diretamente no banco de dados. A vitrine, salas, auditoria e comprovantes operam 100% desacoplados da API externa, mantendo disponibilidade contínua mesmo se o serviço de arte cair.
+- **Catálogo de fallback resiliente** — timeout estrito de 4s na busca externa e catálogo interno curado de obras em domínio público com imagens de alta resolução caso a API externa sofra instabilidade ou rate limit.
+- **Integridade no cancelamento** — cancelamento estritamente restrito a lotes com 0 lances e de propriedade do leiloeiro autenticado. Lotes cancelados são excluídos das consultas da vitrine pública.
+- **Anti-sniping configurado** — lances aceitos nos últimos 2 minutos estendem a data de término do lote em +2 minutos (`endsAt = agora + 2 minutos`).
+- **Livro-razão de carteira** — toda movimentação (depósito, débito/crédito de liquidação) gera um registro em `wallet_transactions` com o saldo resultante.
 - **Secure by default** — guards globais de JWT e de papel; rotas públicas usam `@Public()`.
-- **Autenticação** — bcrypt, mensagens genéricas de erro de login (não revelam se o e-mail
-  existe), comparação com hash fictício para tempo de resposta constante e rate limit nas rotas
-  de credenciais.
+- **Autenticação** — bcrypt, mensagens genéricas de erro de login (não revelam se o e-mail existe), comparação com hash fictício para tempo de resposta constante e rate limit nas rotas de credenciais.
 - **Configuração fail-fast** — variáveis de ambiente validadas com zod no boot.
-
-*(As decisões de lances, anti-sniping, resiliência da API externa e auditoria à prova de
-adulteração serão documentadas nas próximas etapas.)*
 
 ## Status das etapas
 
 - [x] **1. Fundação** — monorepo, PostgreSQL, Prisma, autenticação com papéis, seed de usuários
-- [ ] **2. Catálogo e lotes** — integração com a API do AIC (cache/fallback), criação e
-      cancelamento de lotes, vitrine
-- [ ] **3. Motor de lances** — regras de lance, saldo comprometido, anti-sniping, tempo real
-- [ ] **4. Auditoria e liquidação** — histórico à prova de adulteração, liquidação, comprovante
+- [x] **2. Catálogo e lotes** — integração resiliente com API de arte (cache/timeout/fallback), criação e cancelamento de lotes, vitrine e painel do leiloeiro
+- [ ] **3. Motor de lances** — regras de lance, saldo comprometido, anti-sniping, tempo real via WebSockets
+- [ ] **4. Auditoria e liquidação** — histórico à prova de adulteração (hash chain), liquidação automática, comprovante público
 - [ ] **5. Front-end** — vitrine, sala ao vivo, painel do leiloeiro, carteira, auditoria, dark mode
 - [ ] **6. Entrega** — Docker Compose completo, testes, deploy
 
