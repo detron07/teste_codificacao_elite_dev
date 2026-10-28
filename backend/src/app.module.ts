@@ -8,9 +8,11 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { ArtworksModule } from './artworks/artworks.module';
+import { BidsModule } from './bids/bids.module';
 import { LotsModule } from './lots/lots.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     ArtworksModule,
     LotsModule,
+    WalletModule,
+    BidsModule,
   ],
   controllers: [HealthController],
   providers: [
