@@ -275,8 +275,94 @@ async function seedLots(): Promise<void> {
       },
     });
 
-    console.log('  [OK] Lote encerrado criado com arremate (Portrait of a Woman)');
+    // Emissao do comprovante de arremate para o lote finalizado
+    const settledAt = endsAt;
+    const receiptNumber = 'REC-2026-REM001';
+    const rawData = `${receiptNumber}:${lot.id}:${ana.id}:${auctioneer.id}:${winningAmountCents.toString()}:${settledAt.toISOString()}`;
+    const verificationHash = createHash('sha256').update(rawData).digest('hex');
+
+    await prisma.receipt.create({
+      data: {
+        lotId: lot.id,
+        winnerId: ana.id,
+        auctioneerId: auctioneer.id,
+        finalPriceCents: winningAmountCents,
+        receiptNumber,
+        verificationHash,
+        itemSnapshot: {
+          title: lot.title,
+          description: lot.description,
+          imageUrl: lot.imageUrl,
+          externalItemId: lot.externalItemId,
+          itemAttributes: lot.itemAttributes,
+        },
+        settledAt,
+      },
+    });
+
+    // Registra liquidacao no livro-razao da carteira de Ana e do Leiloeiro
+    const anaWallet = await prisma.wallet.findUnique({ where: { userId: ana.id } });
+    if (anaWallet) {
+      const newBal = anaWallet.balanceCents - winningAmountCents;
+      await prisma.wallet.update({ where: { id: anaWallet.id }, data: { balanceCents: newBal } });
+      await prisma.walletTransaction.create({
+        data: {
+          walletId: anaWallet.id,
+          type: WalletTransactionType.SETTLEMENT_DEBIT,
+          amountCents: -winningAmountCents,
+          balanceAfterCents: newBal,
+          description: `Liquidacao de arremate do lote: ${lot.title}`,
+          createdAt: settledAt,
+        },
+      });
+    }
+
+    const aucWallet = await prisma.wallet.findUnique({ where: { userId: auctioneer.id } });
+    if (aucWallet) {
+      const newBal = aucWallet.balanceCents + winningAmountCents;
+      await prisma.wallet.update({ where: { id: aucWallet.id }, data: { balanceCents: newBal } });
+      await prisma.walletTransaction.create({
+        data: {
+          walletId: aucWallet.id,
+          type: WalletTransactionType.SETTLEMENT_CREDIT,
+          amountCents: winningAmountCents,
+          balanceAfterCents: newBal,
+          description: `Recebimento de arremate do lote: ${lot.title}`,
+          createdAt: settledAt,
+        },
+      });
+    }
+
+    console.log('  [OK] Lote encerrado criado com arremate e comprovante (Portrait of a Woman)');
   } else {
+    // Se o lote ja existia mas ainda nao tem comprovante, garante a emissao
+    const existingReceipt = await prisma.receipt.findUnique({ where: { lotId: existingFinishedLot.id } });
+    if (!existingReceipt && existingFinishedLot.winningBidderId) {
+      const settledAt = existingFinishedLot.endsAt;
+      const receiptNumber = 'REC-2026-REM001';
+      const rawData = `${receiptNumber}:${existingFinishedLot.id}:${existingFinishedLot.winningBidderId}:${auctioneer.id}:${existingFinishedLot.currentPriceCents.toString()}:${settledAt.toISOString()}`;
+      const verificationHash = createHash('sha256').update(rawData).digest('hex');
+
+      await prisma.receipt.create({
+        data: {
+          lotId: existingFinishedLot.id,
+          winnerId: existingFinishedLot.winningBidderId,
+          auctioneerId: auctioneer.id,
+          finalPriceCents: existingFinishedLot.currentPriceCents,
+          receiptNumber,
+          verificationHash,
+          itemSnapshot: {
+            title: existingFinishedLot.title,
+            description: existingFinishedLot.description,
+            imageUrl: existingFinishedLot.imageUrl,
+            externalItemId: existingFinishedLot.externalItemId,
+            itemAttributes: existingFinishedLot.itemAttributes,
+          },
+          settledAt,
+        },
+      });
+      console.log('  [OK] Comprovante emitido para lote encerrado existente');
+    }
     console.log('  - Lote encerrado ja existe - mantido');
   }
 }

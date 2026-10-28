@@ -46,12 +46,14 @@ lances ao vivo, saldo simulado e histórico de lances auditável publicamente.
 │   ├── prisma/         # schema, migrações e seed
 │   └── src/
 │       ├── artworks/   # catálogo externo de obras (Cleveland Museum + fallback resiliente)
+│       ├── audit/      # auditoria criptográfica de lances (verificação de integridade)
 │       ├── auth/       # cadastro, login, JWT, guards de papel
 │       ├── bids/       # motor de lances, tempo real (Socket.IO) e sala ao vivo
 │       ├── config/     # validação das variáveis de ambiente
 │       ├── health/     # health check
 │       ├── lots/       # gestão de lotes, vitrine e painel do leiloeiro
 │       ├── prisma/     # PrismaService
+│       ├── receipts/   # liquidação atômica de lotes, livro-razão e comprovantes públicos
 │       ├── users/      # usuários
 │       └── wallet/     # carteira do licitante e livro-razão
 ├── frontend/           # (etapa 5)
@@ -144,6 +146,11 @@ rotas públicas são marcadas explicitamente.
 | `POST` | `/lots/:id/bids` | Licitante | Submete lance com validação de saldo e anti-sniping |
 | `GET` | `/lots/:id/live-room` | Público | Sala ao vivo (status do usuário, tempo e líder) |
 | `GET` | `/lots/:id/bids` | Público | Histórico auditável de lances (dados anonimizados) |
+| `GET` | `/lots/:id/audit` | Público | Auditoria criptográfica da cadeia de lances (tamper-proof) |
+| `GET` | `/receipts/:id` | Público | Comprovante público de arremate com hash de autenticidade |
+| `GET` | `/lots/:id/receipt` | Público | Comprovante de arremate associado a um lote |
+| `POST` | `/lots/:id/settle` | Leiloeiro | Liquidação manual atômica de lote encerrado |
+| `GET` | `/lots/bidder/my-bids` | Licitante | Histórico de arremates (com comprovantes), lances ativos e superados |
 
 ## Tempo Real (WebSockets)
 
@@ -159,18 +166,20 @@ O servidor WebSocket (Socket.IO) expõe os seguintes eventos:
 | --- | --- | --- |
 | `bid:new` | `{ bid, leaderId, leaderPseudonym, currentPriceCents, endsAt, wasExtended }` | Disparado para a sala `lot:<id>` a cada novo lance aceito |
 | `lot:updated` | `{ lotId, currentPriceCents, endsAt, wasExtended, bidsCount }` | Disparado para a sala `showcase` para atualizar cards em tempo real |
+| `lot:settled` | `{ lotId, status, hadWinner, winnerId, winnerPseudonym, finalPriceCents, receiptNumber, receiptId, settledAt }` | Disparado para a sala `lot:<id>` e `showcase` ao liquidar lote |
 
 ## Decisões técnicas
 
 - **Dinheiro em centavos inteiros** — nenhum valor monetário usa ponto flutuante. Saldos e lances usam `BIGINT`.
 - **Saldo comprometido derivado** — a carteira armazena apenas o saldo total; o comprometido é calculado dinamicamente pela soma dos lances ativos em que o licitante lidera. Quando um licitante é superado, o valor retorna ao disponível imediatamente.
-- **Concorrência serializada (Pessimistic Lock)** — a submissão de lances utiliza transação com `SELECT ... FOR UPDATE` no PostgreSQL, eliminando condições de corrida entre lances simultâneos no mesmo lote.
+- **Concorrência serializada (Pessimistic Lock)** — a submissão de lances e a liquidação utilizam transação com `SELECT ... FOR UPDATE` no PostgreSQL, eliminando condições de corrida entre lances simultâneos ou liquidações concorrentes.
 - **Anti-sniping configurado** — lances aceitos nos últimos 2 minutos estendem a data de término do lote em +2 minutos (`endsAt = agora + 2 minutos`).
 - **Resiliência da API externa (Snapshotting)** — ao criar um lote, todos os dados da obra (título, artista, técnica, dimensões e URL de imagem) são gravados diretamente no banco de dados. A vitrine, salas, auditoria e comprovantes operam 100% desacoplados da API externa, mantendo disponibilidade contínua mesmo se o serviço de arte cair.
 - **Catálogo de fallback resiliente** — timeout estrito de 4s na busca externa e catálogo interno curado de obras em domínio público com imagens de alta resolução caso a API externa sofra instabilidade ou rate limit.
 - **Integridade no cancelamento** — cancelamento estritamente restrito a lotes com 0 lances e de propriedade do leiloeiro autenticado. Lotes cancelados são excluídos das consultas da vitrine pública.
-- **Privacidade e LGPD** — identificação de licitantes por pseudônimo determinístico gerado via HMAC (`Licitante #XXXX`), sem expor nome ou e-mail na sala pública ou histórico.
-- **Histórico criptográfico encadeado** — cada lance calcula seu hash SHA-256 encadeado ao hash do lance anterior (tamper-proof hash chain), permitindo detecção de qualquer adulteração manual.
+- **Privacidade e LGPD** — identificação de licitantes por pseudônimo determinístico gerado via HMAC (`Licitante #XXXX`), sem expor nome ou e-mail na sala pública, na auditoria ou no comprovante.
+- **Histórico criptográfico encadeado (Tamper-proof)** — cada lance calcula seu hash SHA-256 encadeado ao hash do lance anterior (`SHA256(previousHash:lotId:bidderId:amount:timestamp)`). A rota pública `/api/lots/:id/audit` recalcula a cadeia completa e acusa imediatamente qualquer adulteração de valor, elo quebrado ou inserção externa.
+- **Liquidação atômica e comprovante verificável** — encerramento do leilão debita a carteira do arrematante, credita o leiloeiro no livro-razão e gera um `Receipt` imutável com número serial único (`REC-YYYY-XXXX`) e hash de verificação de autenticidade recalculável publicamente.
 - **Livro-razão de carteira** — toda movimentação (depósito, débito/crédito de liquidação) gera um registro em `wallet_transactions` com o saldo resultante.
 - **Secure by default** — guards globais de JWT e de papel; rotas públicas usam `@Public()`.
 - **Autenticação** — bcrypt, mensagens genéricas de erro de login (não revelam se o e-mail existe), comparação com hash fictício para tempo de resposta constante e rate limit nas rotas de credenciais.
@@ -181,7 +190,7 @@ O servidor WebSocket (Socket.IO) expõe os seguintes eventos:
 - [x] **1. Fundação** — monorepo, PostgreSQL, Prisma, autenticação com papéis, seed de usuários
 - [x] **2. Catálogo e lotes** — integração resiliente com API de arte (cache/timeout/fallback), criação e cancelamento de lotes, vitrine e painel do leiloeiro
 - [x] **3. Motor de lances** — regras de lance, saldo comprometido, anti-sniping, tempo real via WebSockets (Socket.IO) e carteira do licitante
-- [ ] **4. Auditoria e liquidação** — histórico à prova de adulteração (hash chain), liquidação automática, comprovante público
+- [x] **4. Auditoria e liquidação** — histórico à prova de adulteração (hash chain), liquidação atômica de lotes, comprovante público com verificação criptográfica
 - [ ] **5. Front-end** — vitrine, sala ao vivo, painel do leiloeiro, carteira, auditoria, dark mode
 - [ ] **6. Entrega** — Docker Compose completo, testes, deploy
 

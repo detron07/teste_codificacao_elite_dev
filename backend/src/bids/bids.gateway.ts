@@ -78,4 +78,14 @@ export class BidsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to('showcase').emit('lot:updated', eventData);
     }
   }
+
+  /**
+   * Notifica os clientes da sala e da vitrine sobre a liquidacao e encerramento de um lote.
+   */
+  broadcastLotSettled(lotId: string, eventData: unknown): void {
+    if (this.server) {
+      this.server.to(`lot:${lotId}`).emit('lot:settled', eventData);
+      this.server.to('showcase').emit('lot:settled', eventData);
+    }
+  }
 }

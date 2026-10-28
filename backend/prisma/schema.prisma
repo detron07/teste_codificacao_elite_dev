@@ -26,10 +26,12 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  wallet       Wallet?
-  createdLots  Lot[]    @relation("AuctioneerLots")
-  wonLots      Lot[]    @relation("WinningBidderLots")
-  bids         Bid[]
+  wallet         Wallet?
+  createdLots    Lot[]     @relation("AuctioneerLots")
+  wonLots        Lot[]     @relation("WinningBidderLots")
+  bids           Bid[]
+  wonReceipts    Receipt[] @relation("WinnerReceipts")
+  issuedReceipts Receipt[] @relation("AuctioneerReceipts")
 
   @@map("users")
 }
@@ -110,6 +112,7 @@ model Lot {
   auctioneer    User      @relation("AuctioneerLots", fields: [auctioneerId], references: [id], onDelete: Restrict)
   winningBidder User?     @relation("WinningBidderLots", fields: [winningBidderId], references: [id], onDelete: SetNull)
   bids          Bid[]
+  receipt       Receipt?
 
   @@index([status, startsAt, endsAt])
   @@index([auctioneerId])
@@ -137,4 +140,27 @@ model Bid {
   @@index([lotId, createdAt(sort: Asc)])
   @@index([bidderId])
   @@map("bids")
+}
+
+/// Comprovante público de arremate de lote.
+/// Gerado na liquidação com assinatura/hash de autenticidade verificável.
+model Receipt {
+  id               String   @id @default(uuid()) @db.Uuid
+  lotId            String   @unique @map("lot_id") @db.Uuid
+  winnerId         String   @map("winner_id") @db.Uuid
+  auctioneerId     String   @map("auctioneer_id") @db.Uuid
+  finalPriceCents  BigInt   @map("final_price_cents")
+  receiptNumber    String   @unique @map("receipt_number") @db.VarChar(50)
+  verificationHash String   @map("verification_hash") @db.VarChar(64)
+  itemSnapshot     Json     @map("item_snapshot")
+  settledAt        DateTime @default(now()) @map("settled_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  lot        Lot  @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  winner     User @relation("WinnerReceipts", fields: [winnerId], references: [id], onDelete: Restrict)
+  auctioneer User @relation("AuctioneerReceipts", fields: [auctioneerId], references: [id], onDelete: Restrict)
+
+  @@index([winnerId])
+  @@index([auctioneerId])
+  @@map("receipts")
 }
