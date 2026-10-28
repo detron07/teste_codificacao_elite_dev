@@ -95,7 +95,18 @@ export const AuctioneerDashboardView: React.FC<AuctioneerDashboardViewProps> = (
 
     try {
       await api.createLot({
+        title: selectedArtwork.title,
+        description: `${selectedArtwork.artist} • ${selectedArtwork.technique || 'Pintura'} (${selectedArtwork.date || 'Data desconhecida'})`,
         externalItemId: selectedArtwork.id,
+        imageUrl: selectedArtwork.imageUrl,
+        itemAttributes: {
+          artist: selectedArtwork.artist,
+          date: selectedArtwork.date,
+          technique: selectedArtwork.technique,
+          department: selectedArtwork.department,
+          culture: selectedArtwork.culture,
+          source: 'cleveland_museum',
+        },
         startPriceCents: Math.round(startPrice * 100),
         minIncrementCents: Math.round(minIncrement * 100),
         startsAt,

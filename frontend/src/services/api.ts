@@ -89,10 +89,14 @@ class ApiClient {
   }
 
   async createLot(data: {
+    title: string;
+    description?: string;
     externalItemId: string;
+    imageUrl: string;
+    itemAttributes: Record<string, unknown>;
     startPriceCents: number;
     minIncrementCents: number;
-    startsAt: string;
+    startsAt?: string;
     endsAt: string;
   }): Promise<LotView> {
     return this.request<LotView>('/lots', {
@@ -185,7 +189,11 @@ class ApiClient {
 
   // --- Obras de Arte (Cleveland Museum) ---
   async searchArtworks(query: string): Promise<ArtworkSearchResult[]> {
-    return this.request<ArtworkSearchResult[]>(`/artworks/search?q=${encodeURIComponent(query)}`);
+    const res = await this.request<{ items: ArtworkSearchResult[]; total: number } | ArtworkSearchResult[]>(
+      `/artworks/search?q=${encodeURIComponent(query)}`,
+    );
+    if (Array.isArray(res)) return res;
+    return res?.items || [];
   }
 }
 
