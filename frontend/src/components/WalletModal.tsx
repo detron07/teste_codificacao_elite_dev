@@ -75,7 +75,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
   const wonLots = participations?.won || [];
   const activeBids = participations?.active || [];
-  const transactions = wallet?.transactions || [];
+  const transactions = wallet?.transactions || wallet?.recentTransactions || [];
 
   return (
     <div

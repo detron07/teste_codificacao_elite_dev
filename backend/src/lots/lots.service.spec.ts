@@ -43,6 +43,11 @@ describe('LotsService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+  };
+  let gateway: {
+    broadcastLotCancelled: jest.Mock;
   };
   let service: LotsService;
 
@@ -54,8 +59,16 @@ describe('LotsService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(prisma)),
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
-    service = new LotsService(prisma as unknown as PrismaService);
+    gateway = {
+      broadcastLotCancelled: jest.fn(),
+    };
+    service = new LotsService(
+      prisma as unknown as PrismaService,
+      gateway as unknown as import('../bids/bids.gateway').BidsGateway,
+    );
   });
 
   describe('create', () => {

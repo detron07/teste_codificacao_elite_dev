@@ -21,6 +21,9 @@ export interface LotView {
   createdAt: string;
   bidsCount?: number;
   timeRemainingSeconds?: number;
+  isLive: boolean;
+  isFinished: boolean;
+  isScheduled: boolean;
 }
 
 export interface ShowcaseResponse {
@@ -86,5 +89,8 @@ export function toLotView(
     createdAt: lot.createdAt.toISOString(),
     bidsCount: lot._count?.bids,
     timeRemainingSeconds,
+    isLive: effectiveStatus === LotStatus.ACTIVE,
+    isFinished: effectiveStatus === LotStatus.FINISHED,
+    isScheduled: effectiveStatus === LotStatus.SCHEDULED,
   };
 }

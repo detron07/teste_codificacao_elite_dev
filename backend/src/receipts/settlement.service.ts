@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -62,7 +63,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
    * 3. Se nao houver lances: marca o lote como FINISHED sem vencedor.
    * 4. Transmite evento Socket.IO 'lot:settled' para a sala do lote e vitrine.
    */
-  async settleLot(lotId: string): Promise<SettlementResult> {
+  async settleLot(lotId: string, callerAuctioneerId?: string): Promise<SettlementResult> {
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM lots WHERE id = ${lotId}::uuid FOR UPDATE;`;
 
@@ -73,6 +74,14 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
       if (!lot) {
         throw new NotFoundException(`Lote com ID ${lotId} nao encontrado`);
+      }
+
+      if (callerAuctioneerId && lot.auctioneerId !== callerAuctioneerId) {
+        throw new ForbiddenException('Apenas o leiloeiro proprietário deste lote pode liquidá-lo');
+      }
+
+      if (lot.status === LotStatus.SCHEDULED) {
+        throw new BadRequestException('Lote agendado ainda não iniciado não pode ser liquidado');
       }
 
       if (lot.status === LotStatus.CANCELLED) {

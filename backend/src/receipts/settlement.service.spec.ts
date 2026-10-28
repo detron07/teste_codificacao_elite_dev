@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LotStatus, WalletTransactionType } from '@prisma/client';
 import { BidsGateway } from '../bids/bids.gateway';
@@ -86,6 +86,28 @@ describe('SettlementService', () => {
     });
 
     await expect(service.settleLot('lot-1')).rejects.toThrow(BadRequestException);
+  });
+
+  it('deve lancar BadRequestException se o lote estiver agendado (SCHEDULED)', async () => {
+    prismaMock.lot.findUnique.mockResolvedValue({
+      id: 'lot-sched',
+      status: LotStatus.SCHEDULED,
+      auctioneerId: 'auc-1',
+      receipt: null,
+    });
+
+    await expect(service.settleLot('lot-sched', 'auc-1')).rejects.toThrow(BadRequestException);
+  });
+
+  it('deve lancar ForbiddenException se outro leiloeiro tentar liquidar o lote', async () => {
+    prismaMock.lot.findUnique.mockResolvedValue({
+      id: 'lot-1',
+      status: LotStatus.ACTIVE,
+      auctioneerId: 'owner-auc',
+      receipt: null,
+    });
+
+    await expect(service.settleLot('lot-1', 'invader-auc')).rejects.toThrow(ForbiddenException);
   });
 
   it('deve retornar idempotente se o lote ja possuir comprovante', async () => {

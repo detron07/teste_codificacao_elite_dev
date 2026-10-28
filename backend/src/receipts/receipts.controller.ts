@@ -76,7 +76,10 @@ export class LotReceiptsController {
   @Roles(Role.AUCTIONEER)
   @Post(':id/settle')
   @HttpCode(HttpStatus.OK)
-  settleLot(@Param('id') lotId: string): Promise<SettlementResult> {
-    return this.settlementService.settleLot(lotId);
+  settleLot(
+    @CurrentUser() user: AuthUser,
+    @Param('id') lotId: string,
+  ): Promise<SettlementResult> {
+    return this.settlementService.settleLot(lotId, user.id);
   }
 }

@@ -20,7 +20,15 @@ export interface WalletView {
   totalBalanceCents: number;
   committedBalanceCents: number;
   availableBalanceCents: number;
-  transactions: Array<{
+  transactions?: Array<{
+    id: string;
+    type: 'DEPOSIT' | 'SETTLEMENT_DEBIT' | 'SETTLEMENT_CREDIT';
+    amountCents: number;
+    balanceAfterCents: number;
+    description: string | null;
+    createdAt: string;
+  }>;
+  recentTransactions?: Array<{
     id: string;
     type: 'DEPOSIT' | 'SETTLEMENT_DEBIT' | 'SETTLEMENT_CREDIT';
     amountCents: number;

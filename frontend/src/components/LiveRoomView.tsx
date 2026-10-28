@@ -94,6 +94,11 @@ export const LiveRoomView: React.FC<LiveRoomViewProps> = ({
           setTimeout(() => setAntiSnipingAlert(false), 8000);
         }
 
+        if (data.endsAt) {
+          const remaining = Math.max(0, Math.floor((new Date(data.endsAt).getTime() - Date.now()) / 1000));
+          setTimeRemaining(remaining);
+        }
+
         return {
           ...prev,
           lot: {
@@ -122,26 +127,33 @@ export const LiveRoomView: React.FC<LiveRoomViewProps> = ({
       }
     };
 
+    const handleLotCancelled = () => {
+      setError('Este lote foi cancelado pelo leiloeiro.');
+    };
+
     socket.on('bid:new', handleNewBid);
     socket.on('lot:settled', handleLotSettled);
+    socket.on('lot:cancelled', handleLotCancelled);
 
     return () => {
       leaveLotRoom(lotId);
       socket.off('bid:new', handleNewBid);
       socket.off('lot:settled', handleLotSettled);
+      socket.off('lot:cancelled', handleLotCancelled);
     };
   }, [lotId, user, isBidder, refreshWallet]);
 
-  // Timer regressivo de 1 segundo
+  // Timer regressivo exato baseado na diferenca temporal real ate endsAt (sem deriva temporal)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) return 0;
-        return prev - 1;
-      });
-    }, 1000);
+    if (!state?.lot.endsAt) return;
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.floor((new Date(state.lot.endsAt).getTime() - Date.now()) / 1000));
+      setTimeRemaining(remaining);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [state?.lot.endsAt]);
 
   const handlePlaceBid = async (amountCentsToPlace: number) => {
     setBidError(null);

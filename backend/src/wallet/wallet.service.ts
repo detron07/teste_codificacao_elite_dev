@@ -32,12 +32,11 @@ export class WalletService {
     const now = new Date();
 
     // Busca os lotes ativos em que o usuario lidera atualmente
+    // Fundos permanecem comprometidos enquanto o lote estiver ACTIVE (ate que a liquidacao debite a carteira)
     const activeLeads = await this.prisma.lot.findMany({
       where: {
         winningBidderId: userId,
         status: LotStatus.ACTIVE,
-        startsAt: { lte: now },
-        endsAt: { gt: now },
       },
       select: {
         id: true,
@@ -54,19 +53,22 @@ export class WalletService {
     const committedCents = Number(committedBigInt);
     const availableCents = Math.max(0, totalCents - committedCents);
 
+    const mappedTransactions = wallet.transactions.map((tx) => ({
+      id: tx.id,
+      type: tx.type,
+      amountCents: Number(tx.amountCents),
+      balanceAfterCents: Number(tx.balanceAfterCents),
+      description: tx.description,
+      createdAt: tx.createdAt.toISOString(),
+    }));
+
     return {
       totalBalanceCents: totalCents,
       committedBalanceCents: committedCents,
       availableBalanceCents: availableCents,
       activeLeadsCount: activeLeads.length,
-      recentTransactions: wallet.transactions.map((tx) => ({
-        id: tx.id,
-        type: tx.type,
-        amountCents: Number(tx.amountCents),
-        balanceAfterCents: Number(tx.balanceAfterCents),
-        description: tx.description,
-        createdAt: tx.createdAt.toISOString(),
-      })),
+      recentTransactions: mappedTransactions,
+      transactions: mappedTransactions,
     };
   }
 
@@ -119,14 +121,10 @@ export class WalletService {
     excludeLotId?: string,
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<bigint> {
-    const now = new Date();
-
     const lots = await tx.lot.findMany({
       where: {
         winningBidderId: userId,
         status: LotStatus.ACTIVE,
-        startsAt: { lte: now },
-        endsAt: { gt: now },
         id: excludeLotId ? { not: excludeLotId } : undefined,
       },
       select: { currentPriceCents: true },

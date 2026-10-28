@@ -117,8 +117,6 @@ export class BidsService {
           where: {
             winningBidderId: bidderId,
             status: LotStatus.ACTIVE,
-            startsAt: { lte: now },
-            endsAt: { gt: now },
             id: { not: lotId },
           },
           select: { currentPriceCents: true },

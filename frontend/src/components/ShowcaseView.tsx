@@ -73,17 +73,19 @@ export const ShowcaseView: React.FC<ShowcaseViewProps> = ({
       });
     };
 
-    const handleLotSettled = () => {
-      // Quando um lote e liquidado, recarrega a vitrine para mover entre abas
+    const handleLotSettledOrCancelled = () => {
+      // Quando um lote e liquidado ou cancelado, recarrega a vitrine para atualizar abas
       void fetchShowcase();
     };
 
     socket.on('lot:updated', handleLotUpdated);
-    socket.on('lot:settled', handleLotSettled);
+    socket.on('lot:settled', handleLotSettledOrCancelled);
+    socket.on('lot:cancelled', handleLotSettledOrCancelled);
 
     return () => {
       socket.off('lot:updated', handleLotUpdated);
-      socket.off('lot:settled', handleLotSettled);
+      socket.off('lot:settled', handleLotSettledOrCancelled);
+      socket.off('lot:cancelled', handleLotSettledOrCancelled);
     };
   }, []);
 

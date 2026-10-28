@@ -15,4 +15,5 @@ export interface WalletSummary {
   availableBalanceCents: number;
   activeLeadsCount: number;
   recentTransactions: WalletTransactionView[];
+  transactions: WalletTransactionView[];
 }

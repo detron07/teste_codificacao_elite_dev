@@ -7,12 +7,16 @@ import {
 import { LotStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelLotDto } from './dto/cancel-lot.dto';
+import { BidsGateway } from '../bids/bids.gateway';
 import { CreateLotDto } from './dto/create-lot.dto';
 import { AuctioneerDashboardMetrics, LotView, ShowcaseResponse, toLotView } from './lots.types';
 
 @Injectable()
 export class LotsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gateway: BidsGateway,
+  ) {}
 
   /**
    * Cria um novo lote a partir de uma obra de arte.
@@ -122,44 +126,60 @@ export class LotsService {
    * Cancela um lote. Regra fundamental de negocio:
    * "cancelar um lote que ainda nao recebeu lances".
    * Se houver pelo menos 1 lance, a operacao e estritamente recusada.
+   * Concorrencia com placeBid e prevenida via row-lock FOR UPDATE.
    */
   async cancel(lotId: string, auctioneerId: string, dto?: CancelLotDto): Promise<LotView> {
-    const lot = await this.prisma.lot.findUnique({
-      where: { id: lotId },
-      include: {
-        _count: { select: { bids: true } },
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM lots WHERE id = ${lotId}::uuid FOR UPDATE;`;
+
+      const lot = await tx.lot.findUnique({
+        where: { id: lotId },
+        include: {
+          _count: { select: { bids: true } },
+        },
+      });
+
+      if (!lot) {
+        throw new NotFoundException(`Lote com ID ${lotId} não encontrado`);
+      }
+
+      if (lot.auctioneerId !== auctioneerId) {
+        throw new ForbiddenException('Apenas o leiloeiro proprietário pode cancelar este lote');
+      }
+
+      if (lot.status === LotStatus.CANCELLED) {
+        throw new BadRequestException('Este lote já está cancelado');
+      }
+
+      if (lot.status === LotStatus.FINISHED) {
+        throw new BadRequestException('Não é possível cancelar um lote já encerrado');
+      }
+
+      if (lot._count.bids > 0) {
+        throw new BadRequestException('Não é possível cancelar um lote que já recebeu lances');
+      }
+
+      return tx.lot.update({
+        where: { id: lotId },
+        data: {
+          status: LotStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancellationReason: dto?.reason || 'Cancelado pelo leiloeiro',
+        },
+        include: {
+          _count: { select: { bids: true } },
+        },
+      });
     });
 
-    if (!lot) {
-      throw new NotFoundException(`Lote com ID ${lotId} não encontrado`);
-    }
-
-    if (lot.auctioneerId !== auctioneerId) {
-      throw new ForbiddenException('Apenas o leiloeiro proprietário pode cancelar este lote');
-    }
-
-    if (lot.status === LotStatus.CANCELLED) {
-      throw new BadRequestException('Este lote já está cancelado');
-    }
-
-    if (lot._count.bids > 0) {
-      throw new BadRequestException('Não é possível cancelar um lote que já recebeu lances');
-    }
-
-    const updated = await this.prisma.lot.update({
-      where: { id: lotId },
-      data: {
-        status: LotStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancellationReason: dto?.reason || 'Cancelado pelo leiloeiro',
-      },
-      include: {
-        _count: { select: { bids: true } },
-      },
+    const view = toLotView(updated);
+    this.gateway.broadcastLotCancelled(lotId, {
+      lotId,
+      status: 'CANCELLED',
+      cancellationReason: view.cancellationReason,
     });
 
-    return toLotView(updated);
+    return view;
   }
 
   /**
