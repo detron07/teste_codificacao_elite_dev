@@ -19,5 +19,36 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: casa-leiloes-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-leilao}:${POSTGRES_PASSWORD:-leilao}@postgres:5432/${POSTGRES_DB:-casa_leiloes}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-auction-challenge-at-least-32-chars-long}
+      JWT_EXPIRES_IN: 86400
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 120
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: casa-leiloes-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+
 volumes:
   postgres_data:
