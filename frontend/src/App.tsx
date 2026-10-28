@@ -7,12 +7,14 @@ import { Navbar } from './components/Navbar';
 import { ReceiptModal } from './components/ReceiptModal';
 import { ShowcaseView } from './components/ShowcaseView';
 import { WalletModal } from './components/WalletModal';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShieldCheck, Gavel, Award } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
+  const { user, isAuctioneer, isBidder } = useAuth();
   const [currentTab, setCurrentTab] = useState<'showcase' | 'live' | 'auctioneer' | 'wallet' | 'receipt' | 'audit'>('showcase');
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
+  const prevUserRef = React.useRef<{ id: string; role: string } | null>(null);
 
   // Modais
   const [auditModalLotId, setAuditModalLotId] = useState<string | null>(null);
@@ -20,6 +22,39 @@ const MainLayout: React.FC = () => {
   const [receiptModalReceiptId, setReceiptModalReceiptId] = useState<string | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  // Sincroniza a tela dinamicamente quando a persona/usuario for alterada
+  useEffect(() => {
+    const prevUser = prevUserRef.current;
+    prevUserRef.current = user ? { id: user.id, role: user.role } : null;
+
+    if (prevUser && user && prevUser.id !== user.id) {
+      if (user.role === 'AUCTIONEER') {
+        // Mudou para o leiloeiro Roberto: se nao estiver em sala ao vivo, abre o Painel do Leiloeiro
+        if (currentTab !== 'live') {
+          setCurrentTab('auctioneer');
+        }
+        setIsWalletModalOpen(false);
+      } else if (user.role === 'BIDDER') {
+        // Mudou para um licitante (Ana ou Bruno): se estava no Painel do Leiloeiro, volta para a Vitrine
+        if (currentTab === 'auctioneer') {
+          setCurrentTab('showcase');
+        }
+      }
+    } else if (!user) {
+      if (currentTab === 'auctioneer') {
+        setCurrentTab('showcase');
+      }
+      setIsWalletModalOpen(false);
+    } else {
+      if (!isAuctioneer && currentTab === 'auctioneer') {
+        setCurrentTab('showcase');
+      }
+      if (!isBidder && isWalletModalOpen) {
+        setIsWalletModalOpen(false);
+      }
+    }
+  }, [user, isAuctioneer, isBidder, currentTab, isWalletModalOpen]);
 
   // Leitura inicial de parametros da URL (suporte a link compartilhavel de comprovante e lote)
   useEffect(() => {

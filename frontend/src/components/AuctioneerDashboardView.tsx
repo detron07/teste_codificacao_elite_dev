@@ -11,6 +11,7 @@ import {
   Award,
   Sparkles,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import type { ArtworkSearchResult, AuctioneerDashboardMetrics } from '../types';
 import { formatCurrency, formatDateTime } from '../utils/format';
@@ -26,6 +27,7 @@ export const AuctioneerDashboardView: React.FC<AuctioneerDashboardViewProps> = (
   onOpenAudit,
   onOpenReceipt,
 }) => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<AuctioneerDashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +64,10 @@ export const AuctioneerDashboardView: React.FC<AuctioneerDashboardViewProps> = (
   };
 
   useEffect(() => {
-    void loadDashboard();
-  }, []);
+    if (user?.role === 'AUCTIONEER') {
+      void loadDashboard();
+    }
+  }, [user?.id, user?.role]);
 
   const handleSearchArtworks = async (e: React.FormEvent) => {
     e.preventDefault();

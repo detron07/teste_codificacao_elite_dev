@@ -27,7 +27,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   onOpenReceipt,
   onEnterLot,
 }) => {
-  const { wallet, refreshWallet } = useAuth();
+  const { wallet, refreshWallet, user } = useAuth();
   const [participations, setParticipations] = useState<BidderParticipationsView | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'won' | 'active' | 'ledger'>('overview');
 
@@ -48,10 +48,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && user?.role === 'BIDDER') {
       void loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, user?.id]);
 
   if (!isOpen) return null;
 
