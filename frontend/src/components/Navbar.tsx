@@ -16,6 +16,7 @@ interface NavbarProps {
   onSelectTab: (tab: 'showcase' | 'auctioneer' | 'wallet') => void;
   onOpenLogin: () => void;
   onOpenWalletModal: () => void;
+  isWalletModalOpen?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   onOpenLogin,
   onOpenWalletModal,
+  isWalletModalOpen = false,
 }) => {
   const { user, wallet, isAuthenticated, isAuctioneer, isBidder, logout, quickLoginAs } = useAuth();
   const [theme, setTheme] = React.useState<'dark' | 'light'>('dark');
@@ -131,8 +133,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {isBidder && (
             <button
-              onClick={() => onSelectTab('wallet')}
-              className={`btn ${currentTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={onOpenWalletModal}
+              className={`btn ${isWalletModalOpen ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.45rem 0.95rem', fontSize: '0.875rem' }}
             >
               <Wallet size={16} />

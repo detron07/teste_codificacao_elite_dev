@@ -56,19 +56,21 @@ const MainLayout: React.FC = () => {
       <Navbar
         currentTab={currentTab}
         onSelectTab={(tab) => {
-          setCurrentTab(tab);
           if (tab === 'wallet') {
             setIsWalletModalOpen(true);
+            return;
           }
+          setCurrentTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenWalletModal={() => setIsWalletModalOpen(true)}
+        isWalletModalOpen={isWalletModalOpen}
       />
 
       {/* Main Content Area */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {currentTab === 'showcase' && (
+        {(currentTab === 'showcase' || currentTab === 'wallet') && (
           <ShowcaseView
             onEnterLot={handleEnterLot}
             onOpenAudit={handleOpenAudit}
@@ -163,7 +165,12 @@ const MainLayout: React.FC = () => {
 
       <WalletModal
         isOpen={isWalletModalOpen}
-        onClose={() => setIsWalletModalOpen(false)}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+          if (currentTab === 'wallet') {
+            setCurrentTab('showcase');
+          }
+        }}
         onOpenReceipt={handleOpenReceipt}
         onEnterLot={handleEnterLot}
       />
