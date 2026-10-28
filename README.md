@@ -56,7 +56,15 @@ lances ao vivo, saldo simulado e histórico de lances auditável publicamente.
 │       ├── receipts/   # liquidação atômica de lotes, livro-razão e comprovantes públicos
 │       ├── users/      # usuários
 │       └── wallet/     # carteira do licitante e livro-razão
-├── frontend/           # (etapa 5)
+├── frontend/           # Aplicação React + Vite + TypeScript
+│   ├── public/         # assets estáticos e favicon
+│   └── src/
+│       ├── components/ # vitrine, sala ao vivo, painel, carteira, auditoria, comprovante
+│       ├── context/    # AuthContext com troca instantânea de personas
+│       ├── services/   # cliente de API e conexão WebSockets (Socket.IO)
+│       ├── utils/      # formatadores de moeda (BRL), contagem regressiva e datas
+│       ├── index.css   # design system (Dark/Light mode, tokens, glassmorphism)
+│       └── types.ts    # tipagens TypeScript de domínio
 └── docker-compose.yml  # PostgreSQL
 ```
 
@@ -94,16 +102,36 @@ npm run start:dev           # API em http://localhost:3000/api
 
 Verifique: `GET http://localhost:3000/api/health` -> `{ "status": "ok", "database": "up" }`.
 
+### 3. Front-end
+
+Em outro terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev                 # Aplicação em http://localhost:5173
+```
+
+O servidor de desenvolvimento do Vite redireciona requisições `/api` e `/socket.io` automaticamente para o backend (`http://localhost:3000`).
+
 ### Scripts úteis (back-end)
 
 | Script | Descrição |
 | --- | --- |
 | `npm run start:dev` | API com hot reload |
-| `npm test` | Testes unitários (Jest) |
+| `npm test` | Testes automatizados (Jest) |
 | `npm run lint` | ESLint (regras type-aware) |
 | `npm run typecheck` | Checagem de tipos |
 | `npm run prisma:migrate` | Cria/aplica migração em desenvolvimento |
 | `npm run db:reset` | Atenção: apaga o banco, reaplica migrações e roda o seed |
+
+### Scripts úteis (front-end)
+
+| Script | Descrição |
+| --- | --- |
+| `npm run dev` | Servidor de desenvolvimento com HMR |
+| `npm run build` | Compilação e verificação de tipos para produção |
+| `npm run preview` | Pré-visualização do bundle de produção |
 
 ## Usuários de teste
 
@@ -191,7 +219,7 @@ O servidor WebSocket (Socket.IO) expõe os seguintes eventos:
 - [x] **2. Catálogo e lotes** — integração resiliente com API de arte (cache/timeout/fallback), criação e cancelamento de lotes, vitrine e painel do leiloeiro
 - [x] **3. Motor de lances** — regras de lance, saldo comprometido, anti-sniping, tempo real via WebSockets (Socket.IO) e carteira do licitante
 - [x] **4. Auditoria e liquidação** — histórico à prova de adulteração (hash chain), liquidação atômica de lotes, comprovante público com verificação criptográfica
-- [ ] **5. Front-end** — vitrine, sala ao vivo, painel do leiloeiro, carteira, auditoria, dark mode
+- [x] **5. Front-end** — vitrine, sala ao vivo com WebSockets, painel do leiloeiro, carteira com depósito simulado, auditoria criptográfica, comprovantes públicos e dark mode
 - [ ] **6. Entrega** — Docker Compose completo, testes, deploy
 
 ## Uso de IA
