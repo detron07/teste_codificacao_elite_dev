@@ -173,6 +173,11 @@ async function seedLots(): Promise<void> {
       },
     });
 
+    await prisma.lot.update({
+      where: { id: lot.id },
+      data: { winningBidderId: bruno.id },
+    });
+
     console.log('  [OK] Lote ao vivo criado com lances abertos (The Red Kerchief)');
   } else {
     console.log('  - Lote ao vivo ja existe - mantido');
