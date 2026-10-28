@@ -220,7 +220,7 @@ O servidor WebSocket (Socket.IO) expõe os seguintes eventos:
 - [x] **3. Motor de lances** — regras de lance, saldo comprometido, anti-sniping, tempo real via WebSockets (Socket.IO) e carteira do licitante
 - [x] **4. Auditoria e liquidação** — histórico à prova de adulteração (hash chain), liquidação atômica de lotes, comprovante público com verificação criptográfica
 - [x] **5. Front-end** — vitrine, sala ao vivo com WebSockets, painel do leiloeiro, carteira com depósito simulado, auditoria criptográfica, comprovantes públicos e dark mode
-- [x] **6. Entrega** — Docker Compose unificado (PostgreSQL + Back-end + Front-end com Nginx), 57 testes automatizados passando, documentação de IA e deploy
+- [x] **6. Entrega** — Docker Compose unificado (PostgreSQL + Back-end + Front-end com Nginx), 59 testes automatizados passando, documentação de IA e deploy
 
 ## Execução com Docker Compose (Comando Único)
 
@@ -287,7 +287,7 @@ A inteligência artificial foi empregada estritamente como acelerador de produti
 - **Geração de Boilerplate e Scaffolding:**
   - Aceleração da digitação de decorators do NestJS, interfaces TypeScript, mapeamento de DTOs com `class-validator` e tipagens de domínio a partir dos esquemas previamente definidos pelo desenvolvedor.
 - **Digitação de Suítes de Testes Automatizados:**
-  - Escrita dos arquivos de teste unitário e de integração no Jest (57 testes cobrindo 11 suítes), materializando em código os cenários de teste, casos de borda e regras de negócio formalizados pelo desenvolvedor.
+  - Escrita dos arquivos de teste unitário e de integração no Jest (59 testes cobrindo 11 suítes), materializando em código os cenários de teste, casos de borda e regras de negócio formalizados pelo desenvolvedor.
 - **Design System e Estilização Front-end:**
   - Apoio na estruturação sintática de variáveis CSS nativas, regras de layout responsivo, tokens de cores e micro-animações da interface em Vanilla CSS.
 
