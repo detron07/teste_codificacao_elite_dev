@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: casa-leiloes-app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casa-leiloes-db
+          property: connectionString
+
+databases:
+  - name: casa-leiloes-db
+    databaseName: casa_leiloes
+    user: leilao
+    plan: free
+    region: oregon
+    postgresMajorVersion: 16

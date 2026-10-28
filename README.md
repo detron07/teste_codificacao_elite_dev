@@ -241,18 +241,38 @@ docker compose up --build
 
 ## Deploy em Produção
 
-O projeto foi estruturado para ser implantado facilmente em qualquer nuvem moderna:
+O projeto conta com configuração de deploy automatizado via contêiner Docker unificado e Blueprint IaC (Infrastructure as Code):
 
-1. **Self-Hosted / VPS (Docker Compose):**
-   - Clone o repositório no servidor.
-   - Configure as variáveis de ambiente em um `.env` de produção (gerando um `JWT_SECRET` seguro de 64 caracteres e senha forte no banco).
-   - Execute `docker compose up -d --build`.
-   - Opcionalmente configure um reverse proxy externo (Traefik ou Cloudflare) para TLS/HTTPS na porta 443.
+### Opção 1: Deploy com 1 Clique no Render (Recomendado)
 
-2. **PaaS (Render / Railway / Fly.io):**
-   - **Banco de dados:** Crie uma instância gerenciada de PostgreSQL 16.
-   - **Back-end (Web Service):** Conecte ao repositório, defina o Root Directory como `./backend`, `Build Command: npm install && npx prisma generate && npm run build`, `Start Command: npx prisma migrate deploy && npm run db:seed && npm run start:prod` e passe a `DATABASE_URL` e `JWT_SECRET`.
-   - **Front-end (Static Site ou Web Service):** Conecte ao repositório, Root Directory `./frontend`, `Build Command: npm install && npm run build`, `Publish Directory: dist`. Configure as rotas de redirecionamento para a URL do back-end.
+O repositório inclui o manifesto [`render.yaml`](./render.yaml), que provisiona automaticamente tanto o banco PostgreSQL 16 quanto o Web Service unificado (front-end estático integrado e API NestJS).
+
+1. Acesse o [Render Dashboard](https://dashboard.render.com/).
+2. Clique em **New +** e selecione **Blueprint**.
+3. Conecte o repositório `detron07/teste_codificacao_elite_dev`.
+4. O Render detectará o `render.yaml` e exibirá os dois recursos a serem criados:
+   - **casa-leiloes-db:** PostgreSQL 16 gerenciado.
+   - **casa-leiloes-app:** Aplicação completa em contêiner Docker.
+5. Clique em **Apply**. O Render fará o build do Dockerfile em múltiplos estágios, aplicará as migrações, executará o seed idempotente e disponibilizará a URL pública HTTPS (ex.: `https://casa-leiloes-app.onrender.com`).
+
+### Opção 2: Deploy no Railway
+
+1. Acesse o [Railway](https://railway.app/) e clique em **New Project** -> **Deploy from GitHub repo**.
+2. Selecione o repositório `detron07/teste_codificacao_elite_dev`.
+3. Adicione um banco de dados PostgreSQL ao projeto (**New** -> **Database** -> **Add PostgreSQL**).
+4. Nas variáveis do serviço da aplicação, adicione:
+   - `DATABASE_URL`: `${{Postgres.DATABASE_URL}}`
+   - `JWT_SECRET`: uma chave aleatória com mais de 32 caracteres.
+   - `CORS_ORIGIN`: `*`
+   - `PORT`: `3000`
+5. O Railway compilará o Dockerfile e fornecerá o domínio público gerado automaticamente.
+
+### Opção 3: Self-Hosted / VPS (Docker Compose)
+
+1. Clone o repositório no servidor: `git clone https://github.com/detron07/teste_codificacao_elite_dev.git`.
+2. Configure as variáveis de ambiente em um `.env` de produção.
+3. Execute: `docker compose up -d --build`.
+
 
 ## Uso de IA
 
